@@ -86,7 +86,7 @@ describe('Pet.kickBy', () => {
     return { left: b.left - 60, top: b.bottom - 30, right: b.right + 60, bottom: b.bottom + 60 };
   };
 
-  it('站在地上被窗口撞一下就飞起来，之后落回地面', () => {
+  it('站在地上被窗口撞一下就飞起来，落回下面后又弹起（不吸附）', () => {
     const pet = makePet();
     settle(pet);
     const floorY = pet.pos.y;
@@ -135,5 +135,69 @@ describe('Pet.kickBy', () => {
     settle(off);
     expect(off.kickBy(1000, under(off), { x: 800, y: -400 })).toBe(false);
     expect(off.mode).not.toBe('air');
+  });
+
+  const stepFor = (pet: Pet, seconds: number, each?: (p: Pet) => void) => {
+    for (let i = 0; i < seconds / STEP; i++) {
+      pet.step(STEP, null);
+      each?.(pet);
+    }
+  };
+
+  it('被踢之后不落地：屏幕底边只反弹，一直弹到用户来抓它', () => {
+    const pet = makePet();
+    settle(pet);
+    pet.kickBy(1000, under(pet), { x: 300, y: -400 });
+    expect(pet.juggling).toBe(true);
+    const modes = new Set<string>();
+    let floorHits = 0;
+    let prevVy = pet.vel.y;
+    stepFor(pet, 40, (p) => {
+      modes.add(p.mode);
+      if (prevVy > 0 && p.vel.y < 0) floorHits++;
+      prevVy = p.vel.y;
+    });
+    expect([...modes]).toEqual(['air']);
+    expect(floorHits).toBeGreaterThan(3);
+  });
+
+  it('被踢之后经过窗口顶边也不会站上去', () => {
+    const pet = makePet();
+    settle(pet);
+    const floorY = pet.pos.y + 0;
+    pet.setPlatforms([{ id: 7, x0: 0, x1: W, y: floorY - 150 }]);
+    pet.kickBy(1000, under(pet), { x: 0, y: -400 });
+    const modes = new Set<string>();
+    stepFor(pet, 20, (p) => modes.add(p.mode));
+    expect([...modes]).toEqual(['air']);
+    expect(pet.support).toBeNull();
+  });
+
+  it('撞到左右屏幕边框只反弹，不贴墙', () => {
+    const pet = makePet();
+    settle(pet);
+    pet.kickBy(1000, under(pet), { x: 0, y: -400 });
+    pet.vel = { x: -3000, y: -300 };
+    const modes = new Set<string>();
+    let flipped = false;
+    stepFor(pet, 3, (p) => {
+      modes.add(p.mode);
+      if (p.vel.x > 0) flipped = true;
+    });
+    expect(flipped).toBe(true);
+    expect(modes.has('cling')).toBe(false);
+  });
+
+  it('用户抓一下（点击或长按）就解除，之后正常落地', () => {
+    const pet = makePet();
+    settle(pet);
+    pet.kickBy(1000, under(pet), { x: 300, y: -400 });
+    stepFor(pet, 1);
+    pet.grab(pet.pos.x, pet.pos.y);
+    expect(pet.juggling).toBe(false);
+    pet.release(0, 0, true);
+    stepFor(pet, 20);
+    expect(pet.mode).not.toBe('air');
+    expect(pet.pos.y).toBeGreaterThan(H - 200);
   });
 });

@@ -77,6 +77,7 @@ export const DEFAULT_TUNING = {
   kickJitter: 160,
   kickCooldownMs: 110,
   kickMinSpeed: 250,
+  kickFloorMin: 900,
 
   // 顿帧
   hitstopHero: 0.09,
@@ -230,6 +231,7 @@ export const PARAM_DEFS: ParamDef[] = [
   r('踢毽子', 'kickJitter', '侧向随机', 0, 800, 10, '总宽度，免得每脚都一样'),
   r('踢毽子', 'kickCooldownMs', '两脚最短间隔(ms)', 0, 500, 5),
   r('踢毽子', 'kickMinSpeed', '连踢最低窗口速度', 0, 1500, 10, '窗口停在宠物身上时低于它只推开不连踢'),
+  r('踢毽子', 'kickFloorMin', '毽子触底最低回弹速度', 300, 3000, 50, '被踢之后不会落地：碰到屏幕底边只反弹，直到你再点或长按它'),
 
   r('顿帧', 'hitstopHero', '英雄落地顿帧', 0, 0.4, 0.005),
   r('顿帧', 'hitstopSplat', '脸着地顿帧', 0, 0.4, 0.005),

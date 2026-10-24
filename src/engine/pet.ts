@@ -403,6 +403,12 @@ export class Pet {
 
   private kicker = new Kicker();
 
+  /**
+   * 毽子模式：被窗口踢过之后进入。不吸附任何东西（窗口顶边、屏幕边框都不落脚、不贴墙），
+   * 屏幕边框只把它反弹回来；用户自己点一下或长按宠物（grab）才结束。
+   */
+  juggling = false;
+
   /** 宠物此刻的碰撞盒（逻辑像素），和画出来的一样大 */
   get hitBox(): Bounds {
     return {
@@ -433,6 +439,7 @@ export class Pet {
       return false;
     }
     this.launch({ x, y, vx: r.vx, vy: r.vy, rot: this.rot, angVel: r.vx * T.throwSpin * 1.5 });
+    this.juggling = true;
     this.events.push({ type: 'throw', vx: r.vx, vy: r.vy });
     return true;
   }
@@ -808,6 +815,7 @@ export class Pet {
   }
 
   grab(x: number, y: number) {
+    this.juggling = false;
     const wasOn = this.grounded ? this.side : null;
     const rot = this.rot + this.visRot;
     const cx = this.pos.x + this.visOffset.x;
@@ -1142,7 +1150,7 @@ export class Pet {
     const ey = s * this.halfW + c * this.halfH;
 
     // 单向平台：只有下落、并且上一步还在顶边上方时才算落上去
-    if (this.vel.y > 0 && this.platforms.length) {
+    if (!this.juggling && this.vel.y > 0 && this.platforms.length) {
       const before = prevY + ey;
       const after = this.pos.y + ey;
       let best: Platform | null = null;
@@ -1162,6 +1170,17 @@ export class Pet {
     const floor = nearestSeg(w, 'floor', this.pos.x, this.pos.y, prevY);
     if (floor && this.pos.y + ey >= floor.c && this.vel.y > 0) {
       this.pos.y = floor.c - ey;
+      if (this.juggling) {
+        // 只反弹，不落地：回弹速度有下限，免得越弹越小最后停在地上
+        const T = this.tuning;
+        const impact = this.vel.y;
+        this.vel.y = -Math.max(impact * T.floorRestitution, T.kickFloorMin);
+        this.vel.x *= T.floorFriction;
+        this.angVel *= 0.5;
+        this.kickSquash(impact, 'floor');
+        this.impact('bounce', { x: this.pos.x, y: floor.c }, NORMAL.floor, impact);
+        return;
+      }
       this.hitFloor(null, floor);
       return;
     }
@@ -1250,7 +1269,7 @@ export class Pet {
     const T = this.tuning;
     const speed = -this.vel.y;
     const contact = { x: this.pos.x, y: seg.c };
-    if (speed >= T.ceilingClingSpeed) {
+    if (!this.juggling && speed >= T.ceilingClingSpeed) {
       this.cling('ceiling', seg, speed, contact);
       return;
     }
@@ -1263,7 +1282,7 @@ export class Pet {
     const T = this.tuning;
     const speed = Math.abs(this.vel.x);
     const contact = { x: seg.c, y: this.pos.y };
-    if (speed >= T.wallClingSpeed) {
+    if (!this.juggling && speed >= T.wallClingSpeed) {
       this.cling(side, seg, speed, contact);
       return;
     }
