@@ -144,21 +144,34 @@ describe('Pet.kickBy', () => {
     }
   };
 
-  it('被踢之后不落地：屏幕底边只反弹，一直弹到用户来抓它', () => {
+  it('被踢之后不落地：每次触底都损失能量，越弹越矮，最后躺在底边上不再动', () => {
     const pet = makePet();
     settle(pet);
-    pet.kickBy(1000, under(pet), { x: 300, y: -400 });
+    const floorY = pet.pos.y;
+    pet.kickBy(1000, under(pet), { x: 0, y: -400 });
     expect(pet.juggling).toBe(true);
     const modes = new Set<string>();
-    let floorHits = 0;
+    const peaks: number[] = [];
+    let apex = pet.pos.y;
     let prevVy = pet.vel.y;
-    stepFor(pet, 40, (p) => {
+    stepFor(pet, 30, (p) => {
       modes.add(p.mode);
-      if (prevVy > 0 && p.vel.y < 0) floorHits++;
+      apex = Math.min(apex, p.pos.y);
+      if (prevVy > 0 && p.vel.y <= 0) {
+        peaks.push(floorY - apex);
+        apex = p.pos.y;
+      }
       prevVy = p.vel.y;
     });
     expect([...modes]).toEqual(['air']);
-    expect(floorHits).toBeGreaterThan(3);
+    expect(peaks.length).toBeGreaterThanOrEqual(3);
+    for (let i = 1; i < peaks.length; i++) expect(peaks[i]).toBeLessThan(peaks[i - 1]);
+    // 最后停住：躺在底边上，速度为 0，但仍不吸附
+    expect(pet.vel.y).toBeLessThan(40);
+    expect(Math.abs(pet.vel.x)).toBeLessThan(1);
+    expect(pet.pos.y).toBeGreaterThan(floorY - 5);
+    expect(pet.support).toBeNull();
+    expect(pet.juggling).toBe(true);
   });
 
   it('被踢之后经过窗口顶边也不会站上去', () => {

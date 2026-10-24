@@ -408,6 +408,8 @@ export class Pet {
    * 屏幕边框只把它反弹回来；用户自己点一下或长按宠物（grab）才结束。
    */
   juggling = false;
+  /** 毽子已经弹不起来了，躺在屏幕底边上（仍然不吸附，等用户来抓） */
+  private juggleRest = false;
 
   /** 宠物此刻的碰撞盒（逻辑像素），和画出来的一样大 */
   get hitBox(): Bounds {
@@ -804,6 +806,7 @@ export class Pet {
     this.hitstop = 0;
     this.pos = { x: s.x, y: s.y };
     this.vel = { x: s.vx, y: s.vy };
+    this.juggleRest = false;
     this.rot = s.rot;
     this.angVel = s.angVel;
     this.visOffset = { x: 0, y: 0 };
@@ -1087,10 +1090,15 @@ export class Pet {
 
   private stepAir(dt: number) {
     const T = this.tuning;
-    let g = T.gravity;
+    let g = T.gravity * (this.juggling ? T.kickGravityMul : 1);
     if (this.vel.y > 0) g *= T.fallGravityMul;
     if (Math.abs(this.vel.y) < T.apexSpeed) g *= T.apexGravityMul;
     this.vel.y += g * dt;
+    if (this.juggleRest) {
+      // 躺在地上：横向按滚动摩擦慢慢停下
+      const f = T.rollFriction * dt;
+      this.vel.x = Math.abs(this.vel.x) <= f ? 0 : this.vel.x - Math.sign(this.vel.x) * f;
+    }
 
     const drag = Math.max(0, 1 - T.airDrag * dt);
     this.vel.x *= drag;
@@ -1171,14 +1179,22 @@ export class Pet {
     if (floor && this.pos.y + ey >= floor.c && this.vel.y > 0) {
       this.pos.y = floor.c - ey;
       if (this.juggling) {
-        // 只反弹，不落地：回弹速度有下限，免得越弹越小最后停在地上
+        // 只反弹不落地，每次都按恢复系数损失能量；弹不起来了就躺在底边上，等用户来抓
         const T = this.tuning;
         const impact = this.vel.y;
-        this.vel.y = -Math.max(impact * T.floorRestitution, T.kickFloorMin);
+        const out = impact * T.kickRestitution;
+        if (out < T.kickRestSpeed) {
+          this.vel.y = 0;
+          this.juggleRest = true;
+          this.angVel = 0;
+        } else {
+          this.vel.y = -out;
+          this.juggleRest = false;
+          this.angVel *= 0.5;
+          this.kickSquash(impact, 'floor');
+          this.impact('bounce', { x: this.pos.x, y: floor.c }, NORMAL.floor, impact);
+        }
         this.vel.x *= T.floorFriction;
-        this.angVel *= 0.5;
-        this.kickSquash(impact, 'floor');
-        this.impact('bounce', { x: this.pos.x, y: floor.c }, NORMAL.floor, impact);
         return;
       }
       this.hitFloor(null, floor);
