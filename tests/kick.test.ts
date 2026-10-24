@@ -200,4 +200,22 @@ describe('Pet.kickBy', () => {
     expect(pet.mode).not.toBe('air');
     expect(pet.pos.y).toBeGreaterThan(H - 200);
   });
+
+  it('毽子飞行中 agent 状态变化或提醒动作都不会把它拽下来', () => {
+    const pet = makePet();
+    settle(pet);
+    pet.kickBy(1000, under(pet), { x: 300, y: -400 });
+    const modes = new Set<string>();
+    let t = 0;
+    stepFor(pet, 30, (p) => {
+      modes.add(p.mode);
+      t += STEP;
+      if (Math.abs(t - 1) < STEP / 2) p.setAgentMood('working');
+      if (Math.abs(t - 3) < STEP / 2) p.cue('zap');
+      if (Math.abs(t - 5) < STEP / 2) p.cue('celebrate');
+      if (Math.abs(t - 7) < STEP / 2) p.setAgentMood('compacting');
+    });
+    expect([...modes]).toEqual(['air']);
+    expect(pet.juggling).toBe(true);
+  });
 });
