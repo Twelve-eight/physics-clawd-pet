@@ -73,6 +73,19 @@ struct CarrierMsg {
     gone: bool,
 }
 
+/// 用户正拖着的窗口（系统移动循环里）。前端拿它当“球拍”去踢宠物。
+#[derive(Serialize, Clone)]
+struct MoverMsg {
+    id: i64,
+    t: f64,
+    left: f64,
+    top: f64,
+    right: f64,
+    bottom: f64,
+    /// 拖动结束
+    gone: bool,
+}
+
 #[derive(Serialize, Clone)]
 struct DndMsg {
     hidden: bool,
@@ -168,6 +181,7 @@ fn run(app: AppHandle, shared: Shared, overlay_id: isize, layout: Layout) {
     let mut last_fullscreen_check: Option<Instant> = None;
     let mut hidden = false;
     let mut carrier_rect: Option<(isize, Rect)> = None;
+    let mut mover_rect: Option<(isize, Rect)> = None;
     let mut revision = 0;
 
     loop {
@@ -336,6 +350,37 @@ fn run(app: AppHandle, shared: Shared, overlay_id: isize, layout: Layout) {
             None => carrier_rect = None,
         }
 
+        // 用户正拖着的窗口：每个循环取一次（一次 GetGUIThreadInfo，没人拖时几乎零开销）
+        match platform::moving_window(overlay_id) {
+            Some((id, r)) => {
+                if mover_rect != Some((id, r)) {
+                    mover_rect = Some((id, r));
+                    let _ = app.emit_to(
+                        OVERLAY,
+                        "desk-mover",
+                        MoverMsg {
+                            id: id as i64,
+                            t: ms(),
+                            left: geo.x(r.left),
+                            top: geo.y(r.top),
+                            right: geo.x(r.right),
+                            bottom: geo.y(r.bottom),
+                            gone: false,
+                        },
+                    );
+                }
+            }
+            None => {
+                if let Some((id, _)) = mover_rect.take() {
+                    let _ = app.emit_to(
+                        OVERLAY,
+                        "desk-mover",
+                        MoverMsg { id: id as i64, t: ms(), left: 0.0, top: 0.0, right: 0.0, bottom: 0.0, gone: true },
+                    );
+                }
+            }
+        }
+
         // 可站立的窗口顶边（10Hz）
         if force_platforms || last_enum.map_or(true, |t| now - t >= Duration::from_millis(100)) {
             last_enum = Some(now);
@@ -352,7 +397,7 @@ fn run(app: AppHandle, shared: Shared, overlay_id: isize, layout: Layout) {
             }
         }
 
-        let busy = hover || dragging || carrier.is_some();
+        let busy = hover || dragging || carrier.is_some() || mover_rect.is_some();
         thread::sleep(Duration::from_millis(if busy { 8 } else { 16 }));
     }
 }

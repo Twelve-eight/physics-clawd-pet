@@ -13,7 +13,7 @@ use crate::lang::Lang;
 
 pub use assist::{decode_system_codepage, http_get, idle_ms, pick_ics};
 pub use desktop::{
-    cursor_pos, frame_bounds, fullscreen_monitors, screens, visible_windows, window_for_pids, window_scale,
+    cursor_pos, frame_bounds, fullscreen_monitors, moving_window, screens, visible_windows, window_for_pids, window_scale,
 };
 pub use input::{input_permission, request_input_permission, InputProbe};
 

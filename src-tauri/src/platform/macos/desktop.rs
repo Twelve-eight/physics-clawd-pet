@@ -121,6 +121,11 @@ pub fn frame_bounds(id: isize) -> Option<Rect> {
     (r.width() > 0 && r.height() > 0).then_some(r)
 }
 
+/// macOS 没有“窗口正被拖动”的公开信号：不支持踢毽子。
+pub fn moving_window(_skip: isize) -> Option<(isize, Rect)> {
+    None
+}
+
 /// 所有可见的窗口，按 Z 序从上到下排列。`skip` 是我们自己的覆盖层。
 pub fn visible_windows(skip: isize) -> Vec<WinInfo> {
     let s = scale();

@@ -17,6 +17,9 @@ import {
   dshStatus,
   dshUninstall,
   loadAssistant,
+  ompInstall,
+  ompStatus,
+  ompUninstall,
   pickIcsFile,
   saveAssistant,
 } from '../platform/host';
@@ -331,6 +334,7 @@ async function main() {
     claude: { status: ccStatus, install: ccInstall, uninstall: ccUninstall },
     codex: { status: codexStatus, install: codexInstall, uninstall: codexUninstall },
     dsh: { status: dshStatus, install: dshInstall, uninstall: dshUninstall },
+    omp: { status: ompStatus, install: () => ompInstall(), uninstall: ompUninstall },
   };
   let refreshing = 0;
   const permBox = $<HTMLInputElement>('ccPermission');
@@ -365,7 +369,9 @@ async function main() {
     toggle.textContent = h.installed ? (h.current ? W.ccDisable : W.ccReinstall) : W.ccEnable;
     toggle.className = h.installed && h.current ? '' : 'primary';
     toggle.disabled = !!cc.bridge_error && !h.installed;
-    $('ccHint').textContent = (provider === 'codex' ? W.codexHint : provider === 'dsh' ? W.dshHint : W.ccHint)(h.settings_path);
+    $('ccHint').textContent = (provider === 'codex' ? W.codexHint : provider === 'dsh' ? W.dshHint : provider === 'omp' ? W.ompHint : W.ccHint)(h.settings_path);
+    // omp 的权限请求不经桌宠，勾选框无意义
+    if (permBox.parentElement) permBox.parentElement.hidden = provider === 'omp';
     const permLabel = permBox.parentElement?.querySelector('span');
     if (permLabel) permLabel.textContent = linkText(W.ccPermission);
 
@@ -406,7 +412,7 @@ async function main() {
 
   providerSelect.onchange = () => {
     const v = providerSelect.value;
-    provider = v === 'codex' || v === 'dsh' ? v : 'claude';
+    provider = v === 'codex' || v === 'dsh' || v === 'omp' ? v : 'claude';
     cc = null;
     permBox.checked = true;
     $<HTMLButtonElement>('ccToggle').disabled = true;

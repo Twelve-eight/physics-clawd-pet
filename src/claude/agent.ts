@@ -3,13 +3,14 @@
 
 import type { AgentMood } from '../engine/pet';
 
-/** 联动对象：Claude Code、Codex、DeepSeek Harness */
-export type AgentProvider = 'claude' | 'codex' | 'dsh';
+/** 联动对象：Claude Code、Codex、DeepSeek Harness、oh-my-pi */
+export type AgentProvider = 'claude' | 'codex' | 'dsh' | 'omp';
 
 /** 把文案里的 "Claude Code" / "Claude" 换成实际联动的那个 */
 export function agentText(text: string, provider?: AgentProvider): string {
   if (provider === 'codex') return text.replace(/Claude(?: Code)?/g, 'Codex');
   if (provider === 'dsh') return text.replace(/Claude(?: Code)?/g, 'DeepSeek');
+  if (provider === 'omp') return text.replace(/Claude(?: Code)?/g, 'omp');
   return text;
 }
 

@@ -14,6 +14,7 @@ mod desktop;
 mod dsh;
 mod input;
 mod lang;
+mod omp;
 mod platform;
 mod watcher;
 
@@ -35,6 +36,9 @@ pub fn cli(args: &[String]) -> Option<i32> {
     }
     if args.iter().any(|a| a == "--remove-dsh-plugin") {
         return Some(if dsh::uninstall().is_ok() { 0 } else { 1 });
+    }
+    if args.iter().any(|a| a == "--remove-omp-extension") {
+        return Some(if omp::uninstall().is_ok() { 0 } else { 1 });
     }
     None
 }
@@ -338,6 +342,26 @@ fn dsh_uninstall() -> Result<(), String> {
     dsh::uninstall()
 }
 
+#[tauri::command]
+fn omp_status(bridge: State<Arc<claude::Bridge>>, token: State<BridgeToken>) -> CcStatus {
+    CcStatus {
+        hooks: omp::status(claude::PORT, &token.0),
+        port: claude::PORT,
+        bridge_error: bridge.error.lock().unwrap().clone(),
+        last_event: bridge.last_omp_event.load(std::sync::atomic::Ordering::Relaxed),
+    }
+}
+
+#[tauri::command]
+fn omp_install(token: State<BridgeToken>) -> Result<(), String> {
+    omp::install(claude::PORT, &token.0)
+}
+
+#[tauri::command]
+fn omp_uninstall() -> Result<(), String> {
+    omp::uninstall()
+}
+
 /// 权限气泡上的按钮：allow / deny / pass（交还终端）
 #[tauri::command]
 fn cc_decide(bridge: State<Arc<claude::Bridge>>, id: u64, behavior: String) -> bool {
@@ -625,6 +649,9 @@ pub fn run() {
             dsh_status,
             dsh_install,
             dsh_uninstall,
+            omp_status,
+            omp_install,
+            omp_uninstall,
             cc_decide
         ])
         .setup(|app| {
@@ -644,6 +671,10 @@ pub fn run() {
             let st = dsh::status(&token);
             if st.installed && !st.current {
                 let _ = dsh::install(&token, st.permission);
+            }
+            let st = omp::status(claude::PORT, &token);
+            if st.installed && !st.current {
+                let _ = omp::install(claude::PORT, &token);
             }
             app.manage(bridge);
             app.manage(BridgeToken(token));

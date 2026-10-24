@@ -28,6 +28,7 @@ pub use imp::{
     cursor_pos,
     frame_bounds,
     fullscreen_monitors,
+    moving_window,
     screens,
     visible_windows,
     window_for_pids,

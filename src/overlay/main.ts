@@ -17,6 +17,7 @@ import {
   type CarrierSample,
   createBus,
   type HitRect,
+  type MoverSample,
   createOverlayHost,
   isTauri,
   loadTuning,
@@ -260,6 +261,20 @@ async function main() {
     if (s.id !== trackedId) return;
     carrierLatest = s;
     carrierSampler.add(s.t, s.left, s.top);
+  });
+
+  // 用户正拖着的窗口：当“球拍”去踢宠物（踢毽子）
+  const moverSampler = new VelocitySampler(300);
+  let moverLatest: MoverSample | null = null;
+  host.onMover((s) => {
+    if (s.gone) {
+      moverLatest = null;
+      moverSampler.clear();
+      return;
+    }
+    if (moverLatest && moverLatest.id !== s.id) moverSampler.clear();
+    moverLatest = s;
+    moverSampler.add(s.t, (s.left + s.right) / 2, (s.top + s.bottom) / 2);
   });
   const carrierMoving = () => carrierLatest !== null && carrierSampler.idleMs(host.clock()) < 150;
 
@@ -507,6 +522,7 @@ async function main() {
   /** 没有任何东西在动：可以降帧省电 */
   const calm = () =>
     !drag &&
+    moverLatest === null &&
     !carrierMoving() &&
     !minis.active &&
     CALM_MODES.has(pet.mode) &&
@@ -565,6 +581,13 @@ async function main() {
       const v =
         carrierSampler.idleMs(t) > 50 ? { x: 0, y: 0 } : carrierSampler.velocity(t, tuning.carrierWindowMs);
       pet.updateCarrier(carrierLatest.id, carrierLatest.left, carrierLatest.top, v.x, v.y);
+    }
+    if (moverLatest) {
+      const t = host.clock();
+      const v = moverSampler.idleMs(t) > 120 ? { x: 0, y: 0 } : moverSampler.velocity(t, tuning.carrierWindowMs * 2);
+      pet.kickBy(t, moverLatest, v);
+    } else {
+      pet.kickBy(0, null, { x: 0, y: 0 });
     }
 
     let simDt = 0;

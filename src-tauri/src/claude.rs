@@ -190,6 +190,7 @@ pub struct Bridge {
     pub last_event: AtomicU64,
     pub last_codex_event: AtomicU64,
     pub last_dsh_event: AtomicU64,
+    pub last_omp_event: AtomicU64,
 }
 
 impl Bridge {
@@ -202,6 +203,7 @@ impl Bridge {
             last_event: AtomicU64::new(0),
             last_codex_event: AtomicU64::new(0),
             last_dsh_event: AtomicU64::new(0),
+            last_omp_event: AtomicU64::new(0),
         })
     }
 
@@ -266,6 +268,7 @@ impl Bridge {
         let last = match msg.get("provider").and_then(Value::as_str) {
             Some("codex") => &self.last_codex_event,
             Some("dsh") => &self.last_dsh_event,
+            Some("omp") => &self.last_omp_event,
             _ => &self.last_event,
         };
         last.store(now_ms(), Ordering::Relaxed);

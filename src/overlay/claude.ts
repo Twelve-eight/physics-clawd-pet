@@ -23,6 +23,7 @@ const ZAP_COOLDOWN = 10000;
 function permHint(provider?: AgentProvider): string {
   if (provider === 'codex') return pick({ zh: '关掉气泡 = 回 Codex 里自己选', ja: '吹き出しを閉じたら、Codex側で選べるで', en: 'Close the bubble to answer in Codex' });
   if (provider === 'dsh') return pick({ zh: '关掉气泡 = 回 DeepSeek Harness 里自己选', ja: '吹き出しを閉じたら、DeepSeek Harness側で選べるで', en: 'Close the bubble to answer in DeepSeek Harness' });
+  if (provider === 'omp') return pick({ zh: '权限请求在 omp 里选', ja: 'Permission prompts stay in omp', en: 'Permission prompts stay in omp' });
   return T.ccPermHint;
 }
 

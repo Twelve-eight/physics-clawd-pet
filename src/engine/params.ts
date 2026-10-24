@@ -67,6 +67,17 @@ export const DEFAULT_TUNING = {
   platformJumpChance: 0.3,
   platformJumpMax: 450,
 
+  // 踢毽子（拖着窗口撞宠物）
+  kickEnabled: 1,
+  kickUpMin: 1000,
+  kickUpMax: 1900,
+  kickUpGain: 0.45,
+  kickSide: 220,
+  kickCarry: 0.6,
+  kickJitter: 160,
+  kickCooldownMs: 110,
+  kickMinSpeed: 250,
+
   // 顿帧
   hitstopHero: 0.09,
   hitstopSplat: 0.14,
@@ -209,6 +220,16 @@ export const PARAM_DEFS: ParamDef[] = [
   r('窗口平台', 'stepOffChance', '走到边缘跳下概率', 0, 1, 0.05),
   r('窗口平台', 'platformJumpChance', '发呆时跳上窗口概率', 0, 1, 0.05),
   r('窗口平台', 'platformJumpMax', '最高能跳多高', 50, 1200, 10),
+
+  b('踢毽子', 'kickEnabled', '拖着窗口撞宠物把它踢起来', '拖动任意窗口的标题栏去撞它；一直撞就一直在空中'),
+  r('踢毽子', 'kickUpMin', '最低向上速度', 200, 4000, 50),
+  r('踢毽子', 'kickUpMax', '向上速度上限', 400, 6000, 50),
+  r('踢毽子', 'kickUpGain', '窗口速度→向上加成', 0, 2, 0.05, '窗口越快踢得越高'),
+  r('踢毽子', 'kickSide', '侧推速度', 0, 1500, 10, '远离窗口中心的方向'),
+  r('踢毽子', 'kickCarry', '继承窗口横向速度', 0, 2, 0.05),
+  r('踢毽子', 'kickJitter', '侧向随机', 0, 800, 10, '总宽度，免得每脚都一样'),
+  r('踢毽子', 'kickCooldownMs', '两脚最短间隔(ms)', 0, 500, 5),
+  r('踢毽子', 'kickMinSpeed', '连踢最低窗口速度', 0, 1500, 10, '窗口停在宠物身上时低于它只推开不连踢'),
 
   r('顿帧', 'hitstopHero', '英雄落地顿帧', 0, 0.4, 0.005),
   r('顿帧', 'hitstopSplat', '脸着地顿帧', 0, 0.4, 0.005),

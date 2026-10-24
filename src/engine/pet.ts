@@ -8,6 +8,7 @@ import {
   rand,
   wrapAngle,
 } from './math';
+import { Kicker } from './kick';
 import { type Tuning, cellSize } from './params';
 import {
   type Bounds,
@@ -398,6 +399,42 @@ export class Pet {
     const before = this.cell;
     this.tuning = t;
     if (this.cell !== before) this.resnap();
+  }
+
+  private kicker = new Kicker();
+
+  /** 宠物此刻的碰撞盒（逻辑像素），和画出来的一样大 */
+  get hitBox(): Bounds {
+    return {
+      left: this.pos.x - this.halfW,
+      top: this.pos.y - this.halfH,
+      right: this.pos.x + this.halfW,
+      bottom: this.pos.y + this.halfH,
+    };
+  }
+
+  /**
+   * 用户拖着的窗口 win（速度 winVel，px/s）撞到宠物就把它踢起来；返回这一帧有没有补一脚。
+   * 被鼠标拎着的时候不理（那是用户在抓它）。
+   */
+  kickBy(now: number, win: Bounds | null, winVel: Vec2): boolean {
+    const T = this.tuning;
+    if (!win || !T.kickEnabled || this.mode === 'held') {
+      this.kicker.reset();
+      return false;
+    }
+    const r = this.kicker.update(now, this.hitBox, win, winVel, T, T.maxSpeed, this.rng);
+    if (!r) return false;
+    const x = this.pos.x + r.dx;
+    const y = this.pos.y + r.dy;
+    if (!r.kicked) {
+      // 窗口停在身上：只把宠物推出去，保持现在的运动
+      this.pos = { x, y };
+      return false;
+    }
+    this.launch({ x, y, vx: r.vx, vy: r.vy, rot: this.rot, angVel: r.vx * T.throwSpin * 1.5 });
+    this.events.push({ type: 'throw', vx: r.vx, vy: r.vy });
+    return true;
   }
 
   /** 换皮肤：碰撞盒跟着网格大小变 */

@@ -118,6 +118,23 @@ pub fn frame_bounds(id: isize) -> Option<Rect> {
     (r.width() > 0 && r.height() > 0).then_some(r)
 }
 
+/// 用户此刻正拖着的顶层窗口（系统移动/调整大小循环里，GetGUIThreadInfo 的 GUI_INMOVESIZE）。
+/// idThread = 0 查前台线程，拖标题栏时鼠标捕获就在它那里。没有人在拖、拖的是 `skip`（我们自己）
+/// 或者窗口不可见时返回 None。
+pub fn moving_window(skip: isize) -> Option<(isize, Rect)> {
+    use windows::Win32::UI::WindowsAndMessaging::{GetGUIThreadInfo, GUITHREADINFO, GUI_INMOVESIZE};
+    let mut info = GUITHREADINFO { cbSize: size_of::<GUITHREADINFO>() as u32, ..Default::default() };
+    unsafe { GetGUIThreadInfo(0, &mut info) }.ok()?;
+    if info.flags.0 & GUI_INMOVESIZE.0 == 0 || info.hwndMoveSize.0.is_null() {
+        return None;
+    }
+    let id = info.hwndMoveSize.0 as isize;
+    if id == skip {
+        return None;
+    }
+    frame_bounds(id).map(|r| (id, r))
+}
+
 /// 桌面、任务栏、通知区域之类：不能站，也不当遮挡物
 const SHELL_CLASSES: &[&str] = &["Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd"];
 /// 系统弹出层（开始菜单、搜索、托盘溢出）：会遮挡，但不能站

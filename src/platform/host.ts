@@ -234,6 +234,28 @@ export async function dshUninstall(): Promise<void> {
   await invoke('dsh_uninstall');
 }
 
+export async function ompStatus(): Promise<CcStatus> {
+  if (!isTauri) {
+    const status = await ccStatus();
+    return { ...status, hooks: { ...status.hooks, settings_path: '~/.omp/agent/extensions/clawd-pet' } };
+  }
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<CcStatus>('omp_status');
+}
+
+/** 把桌宠扩展装进 oh-my-pi（omp / omp-zh）的 agent 目录；omp 的权限请求不经桌宠，所以没有 permission 参数 */
+export async function ompInstall(): Promise<void> {
+  if (!isTauri) throw new Error(PREVIEW_NO_LINK());
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('omp_install');
+}
+
+export async function ompUninstall(): Promise<void> {
+  if (!isTauri) return;
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('omp_uninstall');
+}
+
 /** 权限气泡上的选择：allow / deny / pass（交还终端） */
 export async function ccDecide(id: number, behavior: 'allow' | 'deny' | 'pass'): Promise<boolean> {
   if (!isTauri) return false;
@@ -277,6 +299,17 @@ export interface CarrierSample {
   gone: boolean;
 }
 
+/** 用户正拖着的窗口（系统移动循环里）。gone 表示拖动结束。 */
+export interface MoverSample {
+  id: number;
+  t: number;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  gone: boolean;
+}
+
 /**
  * 覆盖层与桌面的接口。Tauri 下由 Rust 的观察线程负责光标、点击穿透、窗口枚举和全屏检测，
  * 只在有变化时推送事件；浏览器预览下退化为页面内的光标，没有窗口平台。
@@ -295,6 +328,7 @@ export interface OverlayHost {
   /** 宠物能去的屏幕；挂上监听后马上（或者 ready() 之后）会收到一次 */
   onScreens(cb: (msg: ScreensMsg) => void): void;
   onCarrier(cb: (s: CarrierSample) => void): void;
+  onMover(cb: (s: MoverSample) => void): void;
   onDnd(cb: (hidden: boolean, reason: string) => void): void;
   /** 当前有键盘焦点的文本输入框（覆盖层 CSS 像素），没有为 null */
   onInput(cb: (zone: Bounds | null) => void): void;
@@ -355,6 +389,7 @@ export async function createOverlayHost(): Promise<OverlayHost> {
         cb(page());
       },
       onCarrier: () => {},
+      onMover: () => {},
       onDnd: () => {},
       onInput: (cb) => inputCbs.push(cb),
       clock: () => performance.now(),
@@ -375,6 +410,7 @@ export async function createOverlayHost(): Promise<OverlayHost> {
   const platformCbs: ((list: Platform[]) => void)[] = [];
   const screensCbs: ((msg: ScreensMsg) => void)[] = [];
   const carrierCbs: ((s: CarrierSample) => void)[] = [];
+  const moverCbs: ((s: MoverSample) => void)[] = [];
   const dndCbs: ((hidden: boolean, reason: string) => void)[] = [];
   const inputCbs: ((zone: Bounds | null) => void)[] = [];
 
@@ -391,6 +427,10 @@ export async function createOverlayHost(): Promise<OverlayHost> {
     listen<CarrierSample>('desk-carrier', (e) => {
       offset = Math.min(offset, performance.now() - e.payload.t);
       carrierCbs.forEach((cb) => cb(e.payload));
+    }),
+    listen<MoverSample>('desk-mover', (e) => {
+      offset = Math.min(offset, performance.now() - e.payload.t);
+      moverCbs.forEach((cb) => cb(e.payload));
     }),
     listen<{ hidden: boolean; reason: string }>('desk-dnd', (e) =>
       dndCbs.forEach((cb) => cb(e.payload.hidden, e.payload.reason)),
@@ -411,6 +451,7 @@ export async function createOverlayHost(): Promise<OverlayHost> {
     onPlatforms: (cb) => platformCbs.push(cb),
     onScreens: (cb) => screensCbs.push(cb),
     onCarrier: (cb) => carrierCbs.push(cb),
+    onMover: (cb) => moverCbs.push(cb),
     onDnd: (cb) => dndCbs.push(cb),
     onInput: (cb) => inputCbs.push(cb),
     clock: () => (Number.isFinite(offset) ? performance.now() - offset : performance.now()),
