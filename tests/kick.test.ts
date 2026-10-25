@@ -144,34 +144,34 @@ describe('Pet.kickBy', () => {
     }
   };
 
-  it('被踢之后不落地：每次触底都损失能量，越弹越矮，最后躺在底边上不再动', () => {
+  it('每次触底都损失能量，越弹越矮；弹不起来时毽子模式随之结束并正常落地', () => {
     const pet = makePet();
     settle(pet);
     const floorY = pet.pos.y;
     pet.kickBy(1000, under(pet), { x: 0, y: -400 });
     expect(pet.juggling).toBe(true);
-    const modes = new Set<string>();
     const peaks: number[] = [];
     let apex = pet.pos.y;
     let prevVy = pet.vel.y;
+    let endedAt = -1;
+    let i = 0;
     stepFor(pet, 30, (p) => {
-      modes.add(p.mode);
+      i++;
       apex = Math.min(apex, p.pos.y);
       if (prevVy > 0 && p.vel.y <= 0) {
         peaks.push(floorY - apex);
         apex = p.pos.y;
       }
       prevVy = p.vel.y;
+      if (endedAt < 0 && !p.juggling) endedAt = i;
     });
-    expect([...modes]).toEqual(['air']);
     expect(peaks.length).toBeGreaterThanOrEqual(3);
-    for (let i = 1; i < peaks.length; i++) expect(peaks[i]).toBeLessThan(peaks[i - 1]);
-    // 最后停住：躺在底边上，速度为 0，但仍不吸附
-    expect(pet.vel.y).toBeLessThan(40);
-    expect(Math.abs(pet.vel.x)).toBeLessThan(1);
-    expect(pet.pos.y).toBeGreaterThan(floorY - 5);
-    expect(pet.support).toBeNull();
-    expect(pet.juggling).toBe(true);
+    for (let k = 1; k < peaks.length; k++) expect(peaks[k]).toBeLessThan(peaks[k - 1]);
+    expect(endedAt).toBeGreaterThan(0);
+    // 结束之后是普通落地：站到屏幕底边上，不再是 air
+    expect(pet.mode).not.toBe('air');
+    expect(pet.juggling).toBe(false);
+    expect(Math.abs(pet.pos.y - floorY)).toBeLessThan(5);
   });
 
   it('被踢之后经过窗口顶边也不会站上去', () => {
@@ -181,9 +181,14 @@ describe('Pet.kickBy', () => {
     pet.setPlatforms([{ id: 7, x0: 0, x1: W, y: floorY - 150 }]);
     pet.kickBy(1000, under(pet), { x: 0, y: -400 });
     const modes = new Set<string>();
-    stepFor(pet, 20, (p) => modes.add(p.mode));
+    let onPlatform = false;
+    stepFor(pet, 20, (p) => {
+      if (!p.juggling) return;
+      modes.add(p.mode);
+      if (p.support !== null) onPlatform = true;
+    });
     expect([...modes]).toEqual(['air']);
-    expect(pet.support).toBeNull();
+    expect(onPlatform).toBe(false);
   });
 
   it('撞到左右屏幕边框只反弹，不贴墙', () => {
@@ -194,7 +199,7 @@ describe('Pet.kickBy', () => {
     const modes = new Set<string>();
     let flipped = false;
     stepFor(pet, 3, (p) => {
-      modes.add(p.mode);
+      if (p.juggling) modes.add(p.mode);
       if (p.vel.x > 0) flipped = true;
     });
     expect(flipped).toBe(true);
@@ -221,7 +226,7 @@ describe('Pet.kickBy', () => {
     const modes = new Set<string>();
     let t = 0;
     stepFor(pet, 30, (p) => {
-      modes.add(p.mode);
+      if (p.juggling) modes.add(p.mode);
       t += STEP;
       if (Math.abs(t - 1) < STEP / 2) p.setAgentMood('working');
       if (Math.abs(t - 3) < STEP / 2) p.cue('zap');
@@ -229,6 +234,5 @@ describe('Pet.kickBy', () => {
       if (Math.abs(t - 7) < STEP / 2) p.setAgentMood('compacting');
     });
     expect([...modes]).toEqual(['air']);
-    expect(pet.juggling).toBe(true);
   });
 });

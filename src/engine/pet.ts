@@ -405,11 +405,10 @@ export class Pet {
 
   /**
    * 毽子模式：被窗口踢过之后进入。不吸附任何东西（窗口顶边、屏幕边框都不落脚、不贴墙），
-   * 屏幕边框只把它反弹回来；用户自己点一下或长按宠物（grab）才结束。
+   * 屏幕边框只把它反弹回来，每次触底都损失能量；用户自己点一下或长按宠物（grab）结束，
+   * 或者回弹速度低到弹不起来时自动结束并正常落地。
    */
   juggling = false;
-  /** 毽子已经弹不起来了，躺在屏幕底边上（仍然不吸附，等用户来抓） */
-  private juggleRest = false;
 
   /** 宠物此刻的碰撞盒（逻辑像素），和画出来的一样大 */
   get hitBox(): Bounds {
@@ -806,7 +805,6 @@ export class Pet {
     this.hitstop = 0;
     this.pos = { x: s.x, y: s.y };
     this.vel = { x: s.vx, y: s.vy };
-    this.juggleRest = false;
     this.rot = s.rot;
     this.angVel = s.angVel;
     this.visOffset = { x: 0, y: 0 };
@@ -1094,11 +1092,6 @@ export class Pet {
     if (this.vel.y > 0) g *= T.fallGravityMul;
     if (Math.abs(this.vel.y) < T.apexSpeed) g *= T.apexGravityMul;
     this.vel.y += g * dt;
-    if (this.juggleRest) {
-      // 躺在地上：横向按滚动摩擦慢慢停下
-      const f = T.rollFriction * dt;
-      this.vel.x = Math.abs(this.vel.x) <= f ? 0 : this.vel.x - Math.sign(this.vel.x) * f;
-    }
 
     const drag = Math.max(0, 1 - T.airDrag * dt);
     this.vel.x *= drag;
@@ -1179,23 +1172,20 @@ export class Pet {
     if (floor && this.pos.y + ey >= floor.c && this.vel.y > 0) {
       this.pos.y = floor.c - ey;
       if (this.juggling) {
-        // 只反弹不落地，每次都按恢复系数损失能量；弹不起来了就躺在底边上，等用户来抓
         const T = this.tuning;
         const impact = this.vel.y;
         const out = impact * T.kickRestitution;
-        if (out < T.kickRestSpeed) {
-          this.vel.y = 0;
-          this.juggleRest = true;
-          this.angVel = 0;
-        } else {
+        if (out >= T.kickRestSpeed) {
+          // 只反弹不落地，每次都按恢复系数损失能量
           this.vel.y = -out;
-          this.juggleRest = false;
+          this.vel.x *= T.floorFriction;
           this.angVel *= 0.5;
           this.kickSquash(impact, 'floor');
           this.impact('bounce', { x: this.pos.x, y: floor.c }, NORMAL.floor, impact);
+          return;
         }
-        this.vel.x *= T.floorFriction;
-        return;
+        // 弹不起来了：动量归零，毽子模式随之结束，按普通落地处理
+        this.juggling = false;
       }
       this.hitFloor(null, floor);
       return;
